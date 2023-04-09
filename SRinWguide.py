@@ -347,7 +347,7 @@ def cor2gaus_cor(x, y, z, ux, uy, uz):
     
     return x_gaus, y_gaus, z_gaus, ux_gaus, uy_gaus, uz_gaus
 
-def Green_func_integrand(x0, y0, z0, x, y, z, omega, ux, uy, uz, order=5, gradient_term=False, Green_func_type='free_space', **kwargs):
+def Green_func_integrand(x0, y0, z0, x, y, z, omega, ux, uy, uz, order=5, gradient_term=True, Green_func_type='free_space', **kwargs):
     '''
     Parameters
     ----------
@@ -371,10 +371,10 @@ def Green_func_integrand(x0, y0, z0, x, y, z, omega, ux, uy, uz, order=5, gradie
         ~1/gamma_z**2 function integration order. The default is 3.
     
     gradient_term : boolean, optional
-        Account for the gradient term (imporstant in THz for accounting eadge radiation). The default is False.
+        Account for the gradient term (important in THz for accounting edge radiation). The default is False.
     
     Green_func_type : TYPE, optional
-        Type of the Green fuction to be untegrated, may be 'free_space', 'iris', 'pipe'. The default is 'free_space'.
+        Type of the Green function to be integrated can be 'free_space', 'iris', or 'pipe'. The default is 'free_space'.
 
     Returns
     -------
@@ -465,7 +465,7 @@ def Green_func_integrand(x0, y0, z0, x, y, z, omega, ux, uy, uz, order=5, gradie
         t_func = time.time() - start
         print(' Green_func_integrand is calculated in %.2f ' % t_func + 'sec')
 
-        return Gf_x(ux, Green, Int_z, omega), Gf_y(ux, Green, Int_z, omega)
+        return Gf_x(ux, Green, Int_z, omega), Gf_y(uy, Green, Int_z, omega)
      
 def Green_func_integrator(f, z, order=3):
     '''
