@@ -19,6 +19,9 @@ from ocelot.rad.radiation_py import *
 from ocelot.optics.wave import dfl_waistscan, screen2dfl, RadiationField
 from ocelot.gui.dfl_plot import plot_dfl, plot_dfl_waistscan
 
+
+#the dynamic memory allocation version
+
 def G_free_space(x0, y0, z0, x, y, z, omega):
     '''
     Parameters
@@ -886,6 +889,7 @@ def plot_2_dfl_2D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl
     # plt.tight_layout()
     # ax2.set_ylabel('y, [m]')
     plt.show()
+
 
 def plot_2_dfl_1D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl2_label='Ocelot'):
     
