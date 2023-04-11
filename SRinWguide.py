@@ -886,9 +886,6 @@ def plot_2_dfl_2D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl
     # plt.tight_layout()
     # ax2.set_ylabel('y, [m]')
     plt.show()
-    
-plot_2_dfl_2D_dist(dfl_Green, dfl_ocelot, z_hat=z_hat, L_w=L_w, dfl1_label='Green', dfl2_label='Ocelot')
-
 
 def plot_2_dfl_1D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl2_label='Ocelot'):
     
