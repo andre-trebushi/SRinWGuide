@@ -67,7 +67,7 @@ def G_iris(x0, y0, z0, x, y, z, omega, a=0.1, b=0.1, n_list=[0], k_list=[1]):
     '''
     print('    calculating G_iris...')
     start = time.time()
-    print('    n =', a, 'k =', b, 'n_list =', n_list, 'k_list =', k_list)
+    # print('    n =', a, 'k =', b, 'n_list =', n_list, 'k_list =', k_list)
 
     x0, y0 = np.meshgrid(x0, y0)
     
@@ -81,13 +81,17 @@ def G_iris(x0, y0, z0, x, y, z, omega, a=0.1, b=0.1, n_list=[0], k_list=[1]):
     delta = (1 + 1j) * beta0 * np.sqrt((speed_of_light * b)/(4 * omega * a**2))
     
     Green = np.zeros((np.shape(z)[0], np.shape(x0)[0], np.shape(y0)[0], np.shape(omega)[0]))
-    G_nk_array = []
+    G_nk = np.zeros((np.shape(z)[0], np.shape(x0)[0], np.shape(y0)[0], np.shape(omega)[0]))
+    
+    """
+    # old cycle
     for nk in tqdm(list(itertools.product(n_list, k_list))):
         n = nk[0]
         k = nk[1]
         v_nk = special.jn_zeros(n, k)[-1]
         # print('    n =', n, 'k =', k, 'v_nk =', v_nk)
-        
+        G_nk = np.zeros((np.shape(z)[0], np.shape(x0)[0], np.shape(y0)[0], np.shape(omega)[0]))
+
         G_nk = -((1j * speed_of_light * (1.0 - 2.0*delta[np.newaxis, np.newaxis, np.newaxis, :])) / (2 * np.pi * omega[np.newaxis, np.newaxis, np.newaxis, :] * a**2)) * \
             (np.exp(-1j*n*(phi0[np.newaxis, :, :, np.newaxis] - phi[:, np.newaxis, np.newaxis, np.newaxis]))) / (special.jv(n+1, v_nk))**2 * \
                 np.exp(-(1j*speed_of_light*(z0 - z[:,np.newaxis,np.newaxis,np.newaxis]) * v_nk**2 * (1.0 - 2.0*delta[np.newaxis,np.newaxis,np.newaxis,:])) / (2 * omega[np.newaxis,np.newaxis,np.newaxis,:] * a**2)) * \
@@ -95,7 +99,21 @@ def G_iris(x0, y0, z0, x, y, z, omega, a=0.1, b=0.1, n_list=[0], k_list=[1]):
                         special.jv(n, v_nk * (1 - delta[np.newaxis,np.newaxis,np.newaxis,:])*r0[np.newaxis, :, :, np.newaxis]/a)
         
         Green = np.add(Green, G_nk)  #still summing problem here! or not!? 
-
+    """
+    for n in n_list:
+        print("n = {}".format(n))
+        v_nk_list = special.jn_zeros(n, k_list[-1])
+        for k in tqdm(k_list):
+            v_nk = v_nk_list[k - 1]
+            G_nk = -((1j * speed_of_light * (1.0 - 2.0*delta[np.newaxis, np.newaxis, np.newaxis, :])) / (2 * np.pi * omega[np.newaxis, np.newaxis, np.newaxis, :] * a**2)) * \
+                (np.exp(-1j*n*(phi0[np.newaxis, :, :, np.newaxis] - phi[:, np.newaxis, np.newaxis, np.newaxis]))) / (special.jv(n+1, v_nk))**2 * \
+                    np.exp(-(1j*speed_of_light*(z0 - z[:,np.newaxis,np.newaxis,np.newaxis]) * v_nk**2 * (1.0 - 2.0*delta[np.newaxis,np.newaxis,np.newaxis,:])) / (2 * omega[np.newaxis,np.newaxis,np.newaxis,:] * a**2)) * \
+                        special.jv(n, v_nk * (1 - delta[np.newaxis,np.newaxis,np.newaxis,:])*r[:, np.newaxis, np.newaxis, np.newaxis]/a) * \
+                            special.jv(n, v_nk * (1 - delta[np.newaxis,np.newaxis,np.newaxis,:])*r0[np.newaxis, :, :, np.newaxis]/a)
+                 
+            Green = np.add(Green, G_nk)  #still summing problem here! or not!? 
+    
+        
     t_func = time.time() - start
     print('        calculated G_iris in %.2f ' % t_func + 'sec')
         
@@ -133,12 +151,75 @@ def G_pipe(x0, y0, z0, x, y, z, omega, R = 0.02, m_list=[0], k_list=[1]):
     r =  np.sqrt(x**2 + y**2)
     
     Green = np.zeros((np.shape(z)[0], np.shape(x0)[0], np.shape(y0)[0], np.shape(omega)[0]))
+    
+    for m in m_list:
+        mu_mk_list = special.jnp_zeros(m, k_list[-1])
+        nu_mk_list = special.jn_zeros(m,  k_list[-1])
+        for n in tqdm(k_list):
+            mu_mk = mu_mk_list[n - 1]
+            nu_mk = nu_mk_list[n - 1]
+            
+            # print('shape mu, nu = ', mu_mk, nu_mk, np.shape(mu_mk), np.shape(nu_mk))
+            a_m=0
+            if m == 0:
+                a_m = 1
+            elif m >= 1:
+                a_m = 2
+    
+            A_TE_mk = np.sqrt(a_m/np.pi)/(special.jv(m, mu_mk)*np.sqrt(mu_mk**2 - m**2))
+            A_TM_mk = np.sqrt(a_m/np.pi)/(nu_mk*special.jv(m-1, nu_mk))
+            
+            g_TE = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TE_mk**2 * (mu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*mu_mk**2)/(2*omega[np.newaxis, :]*R**2))
+            g_TM = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TM_mk**2 * (nu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*nu_mk**2)/(2*omega[np.newaxis, :]*R**2))
+            
+            m_1_x1_TE =  special.jv(m-1, mu_mk*r0/R)*np.cos((m-1)*phi0) +  special.jv(m+1, mu_mk*r0/R)* np.cos((m+1)*phi0)
+            m_1_y1_TE = -special.jv(m-1, mu_mk*r0/R)*np.sin((m-1)*phi0) +  special.jv(m+1, mu_mk*r0/R)* np.sin((m+1)*phi0)
+            m_1_x2_TE =  special.jv(m-1, mu_mk*r/R)* np.cos((m-1)*phi)  +  special.jv(m+1, mu_mk*r/R) * np.cos((m+1)*phi)
+            m_1_y2_TE = -special.jv(m-1, mu_mk*r/R)* np.sin((m-1)*phi)  +  special.jv(m+1, mu_mk*r/R) * np.sin((m+1)*phi)
+            M1_TE = np.array([[m_1_x1_TE[np.newaxis, :, :] * m_1_x2_TE[:, np.newaxis, np.newaxis], m_1_x1_TE[np.newaxis, :, :] * m_1_y2_TE[:, np.newaxis, np.newaxis]], [m_1_y1_TE[np.newaxis, :, :] * m_1_x2_TE[:, np.newaxis, np.newaxis], m_1_y1_TE[np.newaxis, :, :] * m_1_y2_TE[:, np.newaxis, np.newaxis]]])
+            
+            m_2_x1_TE = -special.jv(m-1, mu_mk*r0/R)*np.sin((m-1)*phi0) - special.jv(m+1, mu_mk*r0/R)* np.sin((m+1)*phi0)
+            m_2_y1_TE = -special.jv(m-1, mu_mk*r0/R)*np.cos((m-1)*phi0) + special.jv(m+1, mu_mk*r0/R)* np.cos((m+1)*phi0)
+            m_2_x2_TE = -special.jv(m-1, mu_mk*r/R)* np.sin((m-1)*phi)  - special.jv(m+1, mu_mk*r/R) * np.sin((m+1)*phi)
+            m_2_y2_TE = -special.jv(m-1, mu_mk*r/R)* np.cos((m-1)*phi)  + special.jv(m+1, mu_mk*r/R) * np.cos((m+1)*phi)
+            M2_TE = np.array([[m_2_x1_TE[np.newaxis, :, :] * m_2_x2_TE[:, np.newaxis, np.newaxis], m_2_x1_TE[np.newaxis, :, :] * m_2_y2_TE[:, np.newaxis, np.newaxis]], [m_2_y1_TE[np.newaxis, :, :] * m_2_x2_TE[:, np.newaxis, np.newaxis], m_2_y1_TE[np.newaxis, :, :] * m_2_y2_TE[:, np.newaxis, np.newaxis]]])
+    
+            m_1_x1_TM = special.jv(m-1, nu_mk*r0/R)*np.sin((m-1)*phi0) - special.jv(m+1, nu_mk*r0/R)*np.sin((m+1)*phi0)
+            m_1_y1_TM = special.jv(m-1, nu_mk*r0/R)*np.cos((m-1)*phi0) + special.jv(m+1, nu_mk*r0/R)*np.cos((m+1)*phi0)
+            m_1_x2_TM = special.jv(m-1, nu_mk*r/R)* np.sin((m-1)*phi)  - special.jv(m+1, nu_mk*r/R) *np.sin((m+1)*phi)
+            m_1_y2_TM = special.jv(m-1, nu_mk*r/R)* np.cos((m-1)*phi)  + special.jv(m+1, nu_mk*r/R) *np.cos((m+1)*phi)
+            M1_TM = np.array([[m_1_x1_TM[np.newaxis, :, :] * m_1_x2_TM[:, np.newaxis, np.newaxis], m_1_x1_TM[np.newaxis, :, :] * m_1_y2_TM[:, np.newaxis, np.newaxis]], [m_1_y1_TM[np.newaxis, :, :] * m_1_x2_TM[:, np.newaxis, np.newaxis], m_1_y1_TM[np.newaxis, :, :] * m_1_y2_TM[:, np.newaxis, np.newaxis]]])
+    
+            m_2_x1_TM =  special.jv(m-1, nu_mk*r0/R)*np.cos((m-1)*phi0) -  special.jv(m+1, nu_mk*r0/R)*np.cos((m+1)*phi0)
+            m_2_y1_TM = -special.jv(m-1, nu_mk*r0/R)*np.sin((m-1)*phi0) -  special.jv(m+1, nu_mk*r0/R)*np.sin((m+1)*phi0)
+            m_2_x2_TM =  special.jv(m-1, nu_mk*r/R)* np.cos((m-1)*phi)  -  special.jv(m+1, nu_mk*r/R) *np.cos((m+1)*phi)
+            m_2_y2_TM = -special.jv(m-1, nu_mk*r/R)* np.sin((m-1)*phi)  -  special.jv(m+1, nu_mk*r/R) *np.sin((m+1)*phi)
+            M2_TM = np.array([[m_2_x1_TM[np.newaxis, :, :] * m_2_x2_TM[:, np.newaxis, np.newaxis], m_2_x1_TM[np.newaxis, :, :] * m_2_y2_TM[:, np.newaxis, np.newaxis]], [m_2_y1_TM[np.newaxis, :, :] * m_2_x2_TM[:, np.newaxis, np.newaxis], m_2_y1_TM[np.newaxis, :, :] * m_2_y2_TM[:, np.newaxis, np.newaxis]]])
+           
+            # print(np.shape(M1_TE), np.shape(M2_TE), np.shape(M1_TM), np.shape(M2_TM))
+            # print(np.shape(g_TE), np.shape(g_TM))
+            G_nk = g_TE[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis, :] * (M1_TE[:, :, :, :, :,np.newaxis] + M2_TE[:, :, :, :, :,np.newaxis]) + g_TM[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis, :] * (M1_TM[:, :, :, :, :,np.newaxis] + M2_TM[:, :, :, :, :,np.newaxis])
+            # print(G_nk)
+            # G_12 = g_TE[np.newaxis, np.newaxis, np.newaxis, :] * (M1_TE[1,0, :, :, :,np.newaxis] + M2_TE[1,0, :, :, :,np.newaxis]) + g_TM[np.newaxis, np.newaxis, np.newaxis, :] * (M1_TM[1,0, :, :, :,np.newaxis] + M2_TM[1,0, :, :, :,np.newaxis])
+            # G_22 = g_TE[np.newaxis, np.newaxis, np.newaxis, :] * (M1_TE[1,1, :, :, :,np.newaxis] + M2_TE[1,1, :, :, :,np.newaxis]) + g_TM[np.newaxis, np.newaxis, np.newaxis, :] * (M1_TM[1,1, :, :, :,np.newaxis] + M2_TM[1,1, :, :, :,np.newaxis])
+            # G_21 = g_TE[np.newaxis, np.newaxis, np.newaxis, :] * (M1_TE[0,1, :, :, :,np.newaxis] + M2_TE[0,1, :, :, :,np.newaxis]) + g_TM[np.newaxis, np.newaxis, np.newaxis, :] * (M1_TM[0,1, :, :, :,np.newaxis] + M2_TM[0,1, :, :, :,np.newaxis])
+            
+            # Green_11 = G_11 + Green_11
+            # Green_12 = G_12 + Green_12
+            # Green_22 = G_22 + Green_22
+            # Green_21 = G_21 + Green_21
+            Green = np.add(G_nk, Green)  #still summing problem here! or not!?  
+            # Green = G_nk + Green
+    
+            # print('            Green function shape = ', np.shape(Green))
+            t_func = time.time() - start
+    """
     for mk in tqdm(list(itertools.product(m_list, k_list))):
         m = mk[0]
         k = mk[1]
         
         mu_mk = special.jnp_zeros(m, k)[-1]
-        nu_mk =  special.jn_zeros(m, k)[-1]
+        nu_mk = special.jn_zeros(m, k)[-1]
         
         # print('shape mu, nu = ', mu_mk, nu_mk, np.shape(mu_mk), np.shape(nu_mk))
         a_m=0
@@ -194,6 +275,7 @@ def G_pipe(x0, y0, z0, x, y, z, omega, R = 0.02, m_list=[0], k_list=[1]):
 
         # print('            Green function shape = ', np.shape(Green))
         t_func = time.time() - start
+        """
     
     print('    calculated G_pipe in %.2f ' % t_func + 'sec')
 
@@ -413,7 +495,7 @@ def Green_func_integrand(x0, y0, z0, x, y, z, omega, ux, uy, uz, order=5, gradie
         # Green = Green[:-1, :, :, :]
         # ux = ux[:-1]
         # uy = uy[:-1]
-        print(np.shape(Green), np.shape(Int_z), np.shape(ux))
+        # print(np.shape(Green), np.shape(Int_z), np.shape(ux))
 
         Gf_x = lambda ux, Green, Int_z, omega: (4*np.pi*q_e/speed_of_light) * ((1j*omega/speed_of_light**2)*ux[:, np.newaxis, np.newaxis, np.newaxis]*Green) * np.exp(1j*Int_z[:, np.newaxis, np.newaxis, :])
         Gf_y = lambda uy, Green, Int_z, omega: (4*np.pi*q_e/speed_of_light) * ((1j*omega/speed_of_light**2)*uy[:, np.newaxis, np.newaxis, np.newaxis]*Green) * np.exp(1j*Int_z[:, np.newaxis, np.newaxis, :])
@@ -576,7 +658,7 @@ def E_ph2THz(x):
 def THz2E_ph(x):
     return x * h_eV_s / 1e-12
     
-def track2motion(beam, lat, energy_loss=True, quantum_diff=True):
+def track2motion(beam, lat, energy_loss=True, quantum_diff=True, accuracy=1):
     
     if beam.__class__ is Beam:
         p = Particle(x=beam.x, y=beam.y, px=beam.xp, py=beam.yp, E=beam.E)
@@ -586,7 +668,7 @@ def track2motion(beam, lat, energy_loss=True, quantum_diff=True):
     # lat = MagneticLattice(und)
     tau0 = np.copy(p_array.tau())
     p_array.tau()[:] = 0
-    U, E = track4rad_beam(p_array, lat, energy_loss=False, quantum_diff=False, accuracy=1)#
+    U, E = track4rad_beam(p_array, lat, energy_loss=False, quantum_diff=False, accuracy=accuracy)#
     U = np.concatenate(U)
     U = np.concatenate(U)
     
@@ -636,7 +718,7 @@ def SR_norm_on_ebeam_I(I_ebeam=0, norm='e_beam'):
 
 def generate_SR_ocelot_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e-3), E_ph=np.array([1, 1000]),
                     polarization='x',
-                    energy_loss=False, quantum_diff=False):
+                    energy_loss=False, quantum_diff=False, accuracy=1):
 
     screen = Screen()
     screen.z = z0     # distance from the begining of lattice to the screen 
@@ -665,9 +747,9 @@ def generate_SR_ocelot_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1
 
 def generate_SR_Green_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e-3), E_ph = np.array([1, 1000]),
                     gradient_term=True, order=5, Green_func_type='free_space', polarization='x',
-                    energy_loss=False, quantum_diff=False):
+                    energy_loss=False, quantum_diff=False, accuracy=1, **kwargs):
 
-    motion = track2motion(beam, lat, energy_loss=energy_loss, quantum_diff=quantum_diff)
+    motion = track2motion(beam, lat, energy_loss=energy_loss, quantum_diff=quantum_diff, accuracy=accuracy)
     
     gamma = beam.E/0.51099890221e-03 #relative energy E_electron/m_e [GeV/Gev]
     beta = np.sqrt(1 - 1/gamma**2)
@@ -698,7 +780,7 @@ def generate_SR_Green_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e
     
     f = Green_func_integrand(dfl.scale_x(), dfl.scale_y(), z0, motion.x, motion.y, motion.z, omega, 
                              ux, uy, u_z, order=order, 
-                             gradient_term=gradient_term, Green_func_type=Green_func_type)
+                             gradient_term=gradient_term, Green_func_type=Green_func_type, **kwargs)
     
     E_x, E_y = Green_func_integrator(f, motion.z, order=order)
     
@@ -713,7 +795,7 @@ def generate_SR_Green_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e
     return dfl
 
 
-def plot_motion(motion, direction='x'):
+def plot_motion(motion, direction='x', filePath=None, savefig=False):
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
     # fig.suptitle('Magnetic field and trajectory', fontsize=24)
     fig_size = 8
@@ -734,17 +816,17 @@ def plot_motion(motion, direction='x'):
         beta = motion.by*1e6
         beta_label = r'$\beta_x \times 10^6, [urad]$'
 
-    ax1.plot(motion.z, magnetic_field, linewidth=2)
+    ax1.plot(motion.z, magnetic_field, linewidth=3)
 
     ax1.set_ylabel(magnetic_field_label, fontsize=18, labelpad = 0.0)
     ax1.grid()
     
-    ax2.plot(motion.z, traj, linewidth=2, color='red')
+    ax2.plot(motion.z, traj, linewidth=3, color='red')
     
     ax2.set_ylabel(traj_label, fontsize=18, labelpad = 0.0)
     ax2.grid()
     
-    ax3.plot(motion.z, beta, linewidth=2, color='orange')
+    ax3.plot(motion.z, beta, linewidth=3, color='orange')
     
     ax3.set_ylabel(beta_label, fontsize=18, labelpad = 0.0)
     ax3.set_xlabel(r'$z, [m]$', fontsize=18, labelpad = 0.0)
@@ -788,17 +870,28 @@ def plot_motion(motion, direction='x'):
 
     ax4.grid()
     '''
+    if savefig != False:
+        if savefig == True:
+            savefig = 'png'
+        # _logger.debug(ind_str + 'saving *{:}.{:}'.format(suffix, savefig))
+        fig.savefig(filePath + '.' + str(savefig), format=savefig, dpi=300)
+    # _logger.debug(ind_str + 'done in {:.2f} seconds'.format(time.time() - start_time))
+
+
     plt.show()
     
-def plot_2_dfl_spectra(dfl1, dfl2, show_THz=False, show_discrepancy=False, show_logy=False, z_hat=None, theta_hat=None):
+def plot_2_dfl_spectra(dfl1, dfl2, dfl1_label='dfl1', dfl2_label='dfl2',
+                       show_THz=False, show_discrepancy=False, 
+                       show_logy=False, z_hat=None, theta_hat=None,
+                       filePath=None, savefig=False):
     
     fig, ax1 = plt.subplots(figsize=(10, 5))
 
     if None not in [z_hat, theta_hat]:
         ax1.set_title(r"$\hat$ = " + str(z_hat) + r", $\hat{\theta}$ = " + str(theta_hat))
 
-    ax1.plot(dfl1.phen(), dfl2.intensity()[:, 0, 0], linewidth=1, color='black', linestyle='-', label='OCELOT')
-    ax1.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], label=r'Green func', linestyle='-.', linewidth=1, color='blue', alpha=1)
+    ax1.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=2, color='black', linestyle='-', label=dfl1_label)
+    ax1.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], label=dfl2_label, linestyle='-.', linewidth=2, color='blue', alpha=1)
     
     ax1.set_xlabel(r'$E_{ph}$, [eV]', fontsize=14)
     ax1.set_xlim(np.min(dfl2.phen()), np.max(dfl2.phen()))
@@ -815,8 +908,8 @@ def plot_2_dfl_spectra(dfl1, dfl2, show_THz=False, show_discrepancy=False, show_
 # 
     if show_logy:
         ax2 = ax1.twinx() 
-        ax2.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=1, color='black', linestyle='-', label='OCELOT')
-        ax2.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], label=r'Green func', linestyle='-.', linewidth=1, color='blue', alpha=1)
+        ax2.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=2, color='black', linestyle='-', label=dfl1_label)
+        ax2.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], label=dfl2_label, linestyle='-.', linewidth=2, color='blue', alpha=1)
         ax2.set_yscale('log')
         ax2.set_yticks([])
         ax2.set_ylim(0)
@@ -826,7 +919,7 @@ def plot_2_dfl_spectra(dfl1, dfl2, show_THz=False, show_discrepancy=False, show_
         I_1 = dfl1.intensity()[:, 0, 0]
         I_2 = dfl2.intensity()[:, 0, 0]
     
-        ax3.plot(dfl_ocelot.phen(), 
+        ax3.plot(dfl1.phen(), 
                  np.where(abs((I_1 - I_2)/(I_1))*0.5e2<=2, 
                           ((I_1 - I_2)/I_1)*1e2, None), label=r'Norm. discrepancy', linewidth=0.5, color='red', alpha=1)
     
@@ -839,9 +932,17 @@ def plot_2_dfl_spectra(dfl1, dfl2, show_THz=False, show_discrepancy=False, show_
         ax3.legend(loc=4)
         
     plt.tight_layout()
+    if savefig != False:
+        if savefig == True:
+            savefig = 'png'
+        # _logger.debug(ind_str + 'saving *{:}.{:}'.format(suffix, savefig))
+        fig.savefig(filePath + '.' + str(savefig), format=savefig, dpi=300)
+    # _logger.debug(ind_str + 'done in {:.2f} seconds'.format(time.time() - start_time))
+
+
     plt.show()
     
-def plot_2_dfl_2D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl2_label='ocelot'):
+def plot_2_dfl_2D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='dfl1', dfl2_label='dfl2'):
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, num='2D', figsize=(15, 5))
     
     if z_hat is not None:
@@ -850,7 +951,7 @@ def plot_2_dfl_2D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl
     dfl1.to_domain('sf')
     
     try:
-        norm = z_hat*(np.sqrt(L_w * lambds/2/np.pi))
+        norm = z_hat*(np.sqrt(L_w * dfl1.xlamds/2/np.pi))
         theta1_x = dfl1.scale_x() / norm
         theta1_y = dfl1.scale_y() / norm
         theta2_x = dfl2.scale_x() / norm
@@ -865,11 +966,11 @@ def plot_2_dfl_2D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl
     I2 = dfl2.intensity()[0, :, :] 
      
     ax1.pcolormesh(theta1_x, theta1_y, I1)
-    ax1.set_title(dfl2_label)
+    ax1.set_title(dfl1_label)
     ax1.set_aspect('equal') 
     
     ax2.pcolormesh(theta2_x, theta2_y, I2)
-    ax2.set_title(dfl1_label)
+    ax2.set_title(dfl2_label)
     ax2.set_yticks([])
     ax2.set_aspect('equal') 
     
@@ -900,7 +1001,7 @@ def plot_2_dfl_1D_dist(dfl1, dfl2, z_hat=None, L_w=None, dfl1_label='Green', dfl
     I2 = dfl2.intensity()[0, :, :]
     
     try:
-        norm = z_hat*(np.sqrt(L_w * lambds/2/np.pi))
+        norm = z_hat*(np.sqrt(L_w * dfl1.xlamds/2/np.pi))
         theta1_x = dfl1.scale_x() / norm
         theta1_y = dfl1.scale_y() / norm
         theta2_x = dfl2.scale_x() / norm
