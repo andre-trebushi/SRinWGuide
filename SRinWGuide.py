@@ -4,6 +4,8 @@ from matplotlib import colors
 
 from scipy.integrate import quad
 from scipy import special
+from scipy.special import comb
+
 import itertools
 from operator import add
 import time
@@ -21,6 +23,17 @@ from ocelot.gui.dfl_plot import plot_dfl, plot_dfl_waistscan
 
 
 #the dynamic memory allocation version
+
+def S(x, x_min=0, x_max=1, N=1):
+    x = np.clip((x - x_min) / (x_max - x_min), 0, 1)
+
+    result = 0
+    for n in range(0, N + 1):
+         result += comb(N + n, n) * comb(2 * N + 1, N - n) * (-x) ** n
+
+    result *= x ** (N + 1)
+
+    return result
 
 def G_free_space(x0, y0, z0, x, y, z, omega):
     '''
@@ -155,10 +168,12 @@ def G_pipe(x0, y0, z0, x, y, z, omega, R = 0.02, m_list=[0], k_list=[1]):
     for m in m_list:
         mu_mk_list = special.jnp_zeros(m, k_list[-1])
         nu_mk_list = special.jn_zeros(m,  k_list[-1])
-        for n in tqdm(k_list):
-            mu_mk = mu_mk_list[n - 1]
-            nu_mk = nu_mk_list[n - 1]
-            
+        for k in tqdm(k_list):
+            # v_nk = v_nk_list[k - 1]
+            mu_mk = mu_mk_list[k - 1]
+            nu_mk = nu_mk_list[k - 1]
+
+     
             # print('shape mu, nu = ', mu_mk, nu_mk, np.shape(mu_mk), np.shape(nu_mk))
             a_m=0
             if m == 0:
@@ -169,8 +184,8 @@ def G_pipe(x0, y0, z0, x, y, z, omega, R = 0.02, m_list=[0], k_list=[1]):
             A_TE_mk = np.sqrt(a_m/np.pi)/(special.jv(m, mu_mk)*np.sqrt(mu_mk**2 - m**2))
             A_TM_mk = np.sqrt(a_m/np.pi)/(nu_mk*special.jv(m-1, nu_mk))
             
-            g_TE = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TE_mk**2 * (mu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*mu_mk**2)/(2*omega[np.newaxis, :]*R**2))
-            g_TM = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TM_mk**2 * (nu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*nu_mk**2)/(2*omega[np.newaxis, :]*R**2))
+            g_TE = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TE_mk**2 * (mu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*mu_mk**2)/(2*omega[np.newaxis, :]*R**2))*S((omega - (speed_of_light * mu_mk**2/ 2 / R)* 1.35 /R / 100 ) , N=1)#/ (0.002 / h_eV_s * 2 * np.pi) free space 100
+            g_TM = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TM_mk**2 * (nu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*nu_mk**2)/(2*omega[np.newaxis, :]*R**2))*S((omega - (speed_of_light * mu_mk**2/ 2 / R)* 1.35 /R / 150) , N=1)#/ (0.002 / h_eV_s * 2 * np.pi)
             
             m_1_x1_TE =  special.jv(m-1, mu_mk*r0/R)*np.cos((m-1)*phi0) +  special.jv(m+1, mu_mk*r0/R)* np.cos((m+1)*phi0)
             m_1_y1_TE = -special.jv(m-1, mu_mk*r0/R)*np.sin((m-1)*phi0) +  special.jv(m+1, mu_mk*r0/R)* np.sin((m+1)*phi0)
@@ -213,8 +228,9 @@ def G_pipe(x0, y0, z0, x, y, z, omega, R = 0.02, m_list=[0], k_list=[1]):
     
             # print('            Green function shape = ', np.shape(Green))
             t_func = time.time() - start
-    """
-    for mk in tqdm(list(itertools.product(m_list, k_list))):
+    
+    """ 
+   for mk in tqdm(list(itertools.product(m_list, k_list))):
         m = mk[0]
         k = mk[1]
         
@@ -913,7 +929,9 @@ def plot_2_dfl_spectra(dfl1, dfl2, dfl1_label='dfl1', dfl2_label='dfl2',
         ax2.set_yscale('log')
         ax2.set_yticks([])
         ax2.set_ylim(0)
-    
+        secax3 = ax2.secondary_yaxis(-0.07)
+        secax3.set_ylabel('Flux, arb.units', fontsize=14)
+        
     if show_discrepancy:
         ax3 = ax1.twinx() 
         I_1 = dfl1.intensity()[:, 0, 0]
@@ -927,8 +945,7 @@ def plot_2_dfl_spectra(dfl1, dfl2, dfl1_label='dfl1', dfl2_label='dfl2',
         ax3.set_ylim(-5, 5)
         ax3.set_ylabel('($I_{ocelot}$ - $I_{Green}$)/$I_{ocelot}$, $\%$', fontsize=14, color='red')
         ax3.tick_params(axis='y', colors='red') 
-        secax3 = ax2.secondary_yaxis(-0.07)
-        secax3.set_ylabel('Flux, arb.units', fontsize=14)
+
         ax3.legend(loc=4)
         
     plt.tight_layout()
