@@ -51,7 +51,7 @@ beta = np.sqrt(1 - 1/gamma**2)
 # undulator parameters
 B0 = 2
 lperiod = 0.9# [m] undulator period 
-nperiods = 10
+nperiods = 3
 L_w = lperiod * nperiods
 K = 0.9336 * B0 * lperiod * 100 # longitudinal coordinates from 0 to lperiod*nperiods in [mm] 
 

@@ -184,8 +184,8 @@ def G_pipe(x0, y0, z0, x, y, z, omega, R = 0.02, m_list=[0], k_list=[1]):
             A_TE_mk = np.sqrt(a_m/np.pi)/(special.jv(m, mu_mk)*np.sqrt(mu_mk**2 - m**2))
             A_TM_mk = np.sqrt(a_m/np.pi)/(nu_mk*special.jv(m-1, nu_mk))
             
-            g_TE = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TE_mk**2 * (mu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*mu_mk**2)/(2*omega[np.newaxis, :]*R**2))*S((omega - (speed_of_light * mu_mk**2/ 2 / R)* 1.35 /R / 100 ) , N=1)#/ (0.002 / h_eV_s * 2 * np.pi) free space 100
-            g_TM = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TM_mk**2 * (nu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*nu_mk**2)/(2*omega[np.newaxis, :]*R**2))*S((omega - (speed_of_light * mu_mk**2/ 2 / R)* 1.35 /R / 150) , N=1)#/ (0.002 / h_eV_s * 2 * np.pi)
+            g_TE = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TE_mk**2 * (mu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*mu_mk**2)/(2*omega[np.newaxis, :]*R**2))#*S((omega - (speed_of_light * mu_mk**2/ 2 / R)/ 1000 ) , N=1)#/ (0.002 / h_eV_s * 2 * np.pi) free space 100
+            g_TM = (speed_of_light)/(2j*omega[np.newaxis, :]) * A_TM_mk**2 * (nu_mk/2/R)**2 * np.exp(-(1j*speed_of_light*(z0 - z[:, np.newaxis])*nu_mk**2)/(2*omega[np.newaxis, :]*R**2))#*S((omega - (speed_of_light * mu_mk**2/ 2 / R)/ 1000) , N=1)#/ (0.002 / h_eV_s * 2 * np.pi)
             
             m_1_x1_TE =  special.jv(m-1, mu_mk*r0/R)*np.cos((m-1)*phi0) +  special.jv(m+1, mu_mk*r0/R)* np.cos((m+1)*phi0)
             m_1_y1_TE = -special.jv(m-1, mu_mk*r0/R)*np.sin((m-1)*phi0) +  special.jv(m+1, mu_mk*r0/R)* np.sin((m+1)*phi0)
@@ -747,18 +747,21 @@ def generate_SR_ocelot_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1
     screen.end_energy =   E_ph[1] # [eV], ending photon energy
     screen.num_energy = shape[2]
     
-    # screen.x = dgrid_xy[0] # half of screen size in [m] in horizontal plane
-    # screen.y = dgrid_xy[1] # half of screen size in [m] in vertical plane
-    screen.size_x = dgrid_xy[0]/2 # half of screen size in [m] in horizontal plane
-    screen.size_y = dgrid_xy[1]/2 # half of screen size in [m] in vertical plane
+    if shape[0] == 1 and shape[1] == 1:
+        screen.x = dgrid_xy[0]/2 # half of screen size in [m] in horizontal plane
+        screen.y = dgrid_xy[1]/2 # half of screen size in [m] in vertical plane
+        screen.size_x = 0
+        screen.size_y = 0 
+    else:
+        screen.size_x = dgrid_xy[0]/2 # half of screen size in [m] in horizontal plane
+        screen.size_y = dgrid_xy[1]/2 # half of screen size in [m] in vertical plane
     screen.nx = shape[0] # number of points in horizontal plane 
     screen.ny = shape[1] # number of points in vertical plane 
 
-    screen = calculate_radiation(lat, screen, beam, energy_loss=energy_loss, quantum_diff=quantum_diff, accuracy=1)
-    
+    screen = calculate_radiation(lat, screen, beam, energy_loss=energy_loss, quantum_diff=quantum_diff, accuracy=accuracy)
+  
     dfl = RadiationField()
     dfl = screen2dfl(screen, polarization=polarization, norm='ebeam', beam=beam)
-
     return dfl
 
 def generate_SR_Green_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e-3), E_ph = np.array([1, 1000]),
@@ -774,8 +777,12 @@ def generate_SR_Green_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e
     
     dfl.domain_z = 'f'
     dfl.domain_xy = 's'
-    dfl.dx = dgrid_xy[0] / dfl.Nx()
-    dfl.dy = dgrid_xy[1] / dfl.Ny()
+    if shape[0] == 1 and shape[1] == 1:
+       dfl.dx = -dgrid_xy[0]
+       dfl.dy = -dgrid_xy[0]
+    else:
+        dfl.dx = dgrid_xy[0] / dfl.Nx()
+        dfl.dy = dgrid_xy[1] / dfl.Ny()
     
     if dfl.Nz() != 1:
         E_ph = np.linspace(E_ph[0], E_ph[1], dfl.Nz())
@@ -804,9 +811,9 @@ def generate_SR_Green_dfl(lat, beam, z0, shape=(51, 51, 100), dgrid_xy=(1e-3, 1e
     E_x, E_y = E_x * np.sqrt(A), E_y * np.sqrt(A)
     
     if polarization == 'x':
-        dfl.fld = np.swapaxes(E_x, 0, 2) 
+        dfl.fld = np.transpose(np.swapaxes(E_x, 2, 0), axes=(0,1,2))
     elif polarization == 'y':
-        dfl.fld = np.swapaxes(E_y, 0, 2) 
+        dfl.fld = np.transpose(np.swapaxes(E_y, 2, 0), axes=(0,1,2))
         
     return dfl
 
@@ -902,18 +909,20 @@ def plot_2_dfl_spectra(dfl1, dfl2, dfl1_label='dfl1', dfl2_label='dfl2',
                        filePath=None, savefig=False):
     
     fig, ax1 = plt.subplots(figsize=(10, 5))
-
+    linewidth = 1.5
     if None not in [z_hat, theta_hat]:
         ax1.set_title(r"$\hat$ = " + str(z_hat) + r", $\hat{\theta}$ = " + str(theta_hat))
 
-    ax1.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=2, color='black', linestyle='-', label=dfl1_label)
-    ax1.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], label=dfl2_label, linestyle='-.', linewidth=2, color='blue', alpha=1)
+    ax1.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=linewidth, color='black', linestyle='-', label=dfl1_label)
+    ax1.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], linewidth=linewidth, label=dfl2_label, linestyle='-.', color='blue', alpha=1)
     
     ax1.set_xlabel(r'$E_{ph}$, [eV]', fontsize=14)
     ax1.set_xlim(np.min(dfl2.phen()), np.max(dfl2.phen()))
     ax1.set_ylim(0)
 
-    ax1.legend(loc=3)
+    ax1.legend(loc=2)
+    # legend = ax1.legend(facecolor='white', framealpha=1)
+
     ax1.grid()
 
     if show_THz:
@@ -924,8 +933,8 @@ def plot_2_dfl_spectra(dfl1, dfl2, dfl1_label='dfl1', dfl2_label='dfl2',
 # 
     if show_logy:
         ax2 = ax1.twinx() 
-        ax2.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=2, color='black', linestyle='-', label=dfl1_label)
-        ax2.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], label=dfl2_label, linestyle='-.', linewidth=2, color='blue', alpha=1)
+        ax2.plot(dfl1.phen(), dfl1.intensity()[:, 0, 0], linewidth=linewidth, color='black', linestyle='-', label=dfl1_label)
+        ax2.plot(dfl2.phen(), dfl2.intensity()[:, 0, 0], linewidth=linewidth, label=dfl2_label, linestyle='-.', color='blue', alpha=1)
         ax2.set_yscale('log')
         ax2.set_yticks([])
         ax2.set_ylim(0)
